@@ -219,11 +219,12 @@ BEGIN
     VALUES ('WARN', '用人單位 ' || NEW.company_name || ' 被標記為財務風險，已自動將其執行中合約狀態變更為財務風險。');
 END;
 
--- Trigger 3: 員工打卡前，若持有已失效證照，則拒絕打卡
+-- Trigger 3: 員工打卡前，若持有已失效證照且名下沒有任何其他有效的證照，則拒絕打卡
 CREATE TRIGGER IF NOT EXISTS trigger_check_cert_status_before_attendance
 BEFORE INSERT ON attendance
 BEGIN
     SELECT CASE
+        -- 情況一：員工持有已失效的證照
         WHEN EXISTS (
             SELECT 1 
             FROM contract c
@@ -232,6 +233,15 @@ BEGIN
             WHERE c.contract_id = NEW.contract_id 
               AND cr.cert_status = '已失效'
         )
-        THEN RAISE(ABORT, '打卡失敗：該員工持有已失效的必要證照，系統已暫停其出勤權限！')
+        -- 且同時：不存在任何狀態為 '有效' 或 '即將到期' 的證照
+        AND NOT EXISTS (
+            SELECT 1 
+            FROM contract c
+            JOIN matching_record m ON c.matching_id = m.matching_id
+            JOIN cert cr ON m.employee_id = cr.employee_id
+            WHERE c.contract_id = NEW.contract_id 
+              AND (cr.cert_status = '有效' OR cr.cert_status = '即將到期')
+        )
+        THEN RAISE(ABORT, '打卡失敗：該員工持有已失效的必要證照且無任何其他有效證照，系統已暫停其出勤權限！')
     END;
 END;

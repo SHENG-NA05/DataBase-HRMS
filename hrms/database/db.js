@@ -184,6 +184,31 @@ export function checkAndUpdateSystemStates() {
       }
     }
 
+    // (d) 解除過期停權：若員工狀態為 '合約暫停'，但其擁有至少一張狀態為 '有效' 或 '即將到期' 的證照，自動恢復為 '啟用'
+    const restoredEmployees = db.prepare(`
+      SELECT DISTINCT emp.employee_id, emp.emp_name
+      FROM employee emp
+      WHERE emp.user_status = '合約暫停'
+        AND EXISTS (
+          SELECT 1 FROM cert cr 
+          WHERE cr.employee_id = emp.employee_id 
+            AND (cr.cert_status = '有效' OR cr.cert_status = '即將到期')
+        )
+    `).all();
+
+    if (restoredEmployees.length > 0) {
+      const updateEmpStatus = db.prepare("UPDATE employee SET user_status = '啟用' WHERE employee_id = ?");
+      const insertLog = db.prepare(`
+        INSERT INTO system_logs (log_type, message)
+        VALUES ('INFO', '員工 ' || ? || ' (' || ? || ') 已上傳/更新有效證照，系統已自動解除其「合約暫停」狀態並恢復打卡權限。')
+      `);
+      
+      for (const emp of restoredEmployees) {
+        updateEmpStatus.run(emp.employee_id);
+        insertLog.run(emp.emp_name, emp.employee_id);
+      }
+    }
+
     // 2. 合約到期狀態更新
     // (a) 找出今天過期但狀態為執行中的合約
     const expiredContracts = db.prepare(`

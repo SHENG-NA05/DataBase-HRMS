@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import db from '../../../database/db.js';
+import db, { checkAndUpdateSystemStates } from '../../../database/db.js';
 
 // 獲取員工的完整資料（合約、出勤、薪資、證照）
 export async function GET(req) {
   try {
+    // 先執行全域系統狀態檢查與自動更新
+    checkAndUpdateSystemStates();
+
     const { searchParams } = new URL(req.url);
     const employeeId = searchParams.get('id');
 
