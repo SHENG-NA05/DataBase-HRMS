@@ -1,11 +1,11 @@
-import { initDB } from './db.js';
+import { resetDB } from './db.js';
 import db from './db.js';
 
 console.log("=== 測試資料庫初始化與 Triggers 運作 ===");
 
 try {
-  // 1. 初始化資料庫 (建表、建 Trigger、導 Seed Data)
-  initDB();
+  // 1. 重置資料庫 (刪除舊檔、建表、建 Trigger、導 Seed Data)
+  resetDB();
 
   // 2. 驗證資料是否寫入
   const companies = db.prepare("SELECT * FROM company").all();

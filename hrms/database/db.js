@@ -235,4 +235,38 @@ export function checkAndUpdateSystemStates() {
   console.log('--- 系統狀態更新與同步檢查完成 ---');
 }
 
-export default db;
+// 一鍵重置資料庫 (刪除舊檔並重跑 Schema 與 Seed)
+export function resetDB() {
+  console.log('--- 開始重置資料庫 ---');
+  db.close();
+  try {
+    if (fs.existsSync(DB_PATH)) {
+      fs.unlinkSync(DB_PATH);
+      console.log('--- 舊資料庫檔案已刪除 ---');
+    }
+  } catch (err) {
+    console.error('刪除資料庫檔案失敗:', err);
+  }
+  
+  // 重新連線與初始化
+  if (process.env.NODE_ENV === 'production') {
+    db = new Database(DB_PATH);
+  } else {
+    global.db = new Database(DB_PATH);
+    db = global.db;
+  }
+  db.pragma('foreign_keys = ON');
+  
+  initDB();
+  console.log('--- 資料庫重置與種子資料載入成功 ---');
+}
+
+const dbWrapper = {
+  prepare(sql) { return db.prepare(sql); },
+  exec(sql) { return db.exec(sql); },
+  transaction(fn) { return db.transaction(fn); },
+  close() { return db.close(); },
+  pragma(sql, val) { return db.pragma(sql, val); }
+};
+
+export default dbWrapper;
